@@ -17,55 +17,77 @@ async function loadMobilenet() {
   console.log('Model MobileNet berhasil dimuat.');
 }
 
+function selectImageFile() {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => {
+      resolve(input.files[0]);
+    };
+    input.click();
+  });
+}
+
+function preprocessImage(img) {
+  return tf.tidy(() => {
+    return tf.browser.fromPixels(img)
+      .resizeNearestNeighbor([224, 224])
+      .toFloat()
+      .div(255.0)
+      .expandDims();
+  });
+}
+
+async function trainModel(){
+  try {
+    const embeddings = images.map(img => mobilenetModel.infer(preprocessImage(img), true));
+    const xs = tf.concat(embeddings);
+    const labelIndices = labels.map(label => labelSet.indexOf(label));
+    const labelTensor = tf.tensor1d(labelIndices, 'int32');
+    const ys = tf.oneHot(labelTensor, labelSet.length);
+    console.log('Konversi label ke one-hot encoding DONE')
+  
+    model = tf.sequential();
+    model.add(tf.layers.dense({ inputShape: [embeddings[0].shape[1]], units: 100, activation: 'relu' }));
+    model.add(tf.layers.dense({ units: labelSet.length, activation: 'softmax' }));
+    model.compile({ loss: 'categoricalCrossentropy', optimizer: 'adam', metrics: ['accuracy'] });
+    console.log('Model Iniated');
+  
+    await model.fit(xs, ys, {
+      epochs: 10,
+      callbacks: {
+        onEpochEnd: (epoch, logs) => {
+          console.log(`Epoch ${epoch + 1}: loss = ${logs.loss}, accuracy = ${logs.acc}`);
+        }
+      }
+    });
+    console.log('Pelatihan selesai.');
+  } catch (error) {
+    console.error(error);
+  }
+}
+
 imageUpload.addEventListener('change', (event) => {
   const files = event.target.files;
   for (let file of files) {
     const reader = new FileReader();
+    labels.push(file.name.split("_")[0]);
     reader.onload = (e) => {
       const img = new Image();
       img.src = e.target.result;
       img.onload = () => {
-        imageContainer.appendChild(img);
-        const label = prompt('Masukkan label untuk gambar ini:');
         images.push(img);
-        labels.push(label);
       };
     };
     reader.readAsDataURL(file);
   }
+  labelSet = [...new Set(labels)];
+  console.log(labelSet);
 });
 
-trainButton.addEventListener('click', async () => {
-  const embeddings = [];
-  for (let img of images) {
-    const input = preprocessImage(img);
-    const activation = mobilenetModel.infer(input, true);
-    embeddings.push(activation);
-  }
-
-  const xs = tf.concat(embeddings);
-  labelSet = [...new Set(labels)];
-  const labelIndices = labels.map(label => labelSet.indexOf(label));
-  const labelTensor = tf.tensor1d(labelIndices, 'int32');
-  const ys = tf.oneHot(labelTensor, labelSet.length);
-  console.log('Konversi label ke one-hot encoding DONE')
-
-  model = tf.sequential();
-  model.add(tf.layers.dense({ inputShape: [embeddings[0].shape[1]], units: 100, activation: 'relu' }));
-  model.add(tf.layers.dense({ units: labelSet.length, activation: 'softmax' }));
-  model.compile({ loss: 'categoricalCrossentropy', optimizer: 'adam', metrics: ['accuracy'] });
-  console.log('Model Iniated');
-
-  await model.fit(xs, ys, {
-    epochs: 10,
-    callbacks: {
-      onEpochEnd: (epoch, logs) => {
-        console.log(`Epoch ${epoch + 1}: loss = ${logs.loss}, accuracy = ${logs.acc}`);
-      }
-    }
-  });
-
-  console.log('Pelatihan selesai.');
+trainButton.addEventListener('click', () => {
+  trainModel();
 });
 
 predictButton.addEventListener('click', async () => {
@@ -146,27 +168,5 @@ saveButton.addEventListener('click', async () => {
         alert('Terjadi kesalahan saat memuat.');
       }
   });
-
-function selectImageFile() {
-  return new Promise((resolve) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = () => {
-      resolve(input.files[0]);
-    };
-    input.click();
-  });
-}
-
-function preprocessImage(img) {
-    return tf.tidy(() => {
-      return tf.browser.fromPixels(img)
-        .resizeNearestNeighbor([224, 224])
-        .toFloat()
-        .div(255.0)
-        .expandDims();
-    });
-  }
 
 loadMobilenet();
