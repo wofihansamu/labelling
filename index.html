@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Pelabelan Gambar dengan TensorFlow.js</title>
+  <script src="./libs/tfjs.js"></script>
+  <script src="./libs/mobilenet.js"></script>
+</head>
+<body>
+  <h1>Pelabelan Gambar</h1>
+  <input type="file" id="image-upload" accept="image/*" multiple />
+  <div id="image-container"></div>
+  <button id="train-button">Latih Model</button>
+  <button id="predict-button">Prediksi</button>
+  <button id="save-button">Simpan Model</button>
+  <button id="load-button">Load Model</button>
+  <button id="load-fromServer-button">Load From Server Model</button>
+  <script src="app.js"></script>
+</body>
+</html>
